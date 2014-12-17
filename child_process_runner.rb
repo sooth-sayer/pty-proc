@@ -82,7 +82,9 @@ class ChildProcessRunner
   end
 
   def git_clone(repo, clone_path)
-    ChildProcessExecutor.start('git', 'clone', '--progress', repo, clone_path, log)
+    ChildProcessExecutor.start('git', 'clone', '--progress', repo, clone_path, log) do |process|
+      process.environment['GIT_SSH'] = './templates/git_ssh.sh'
+    end
   end
 
   def docker_build(image_name, build_path)

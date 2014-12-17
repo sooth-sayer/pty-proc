@@ -8,6 +8,9 @@ class ChildProcessExecutor
     r,w = IO.pipe
 
     process = ChildProcess.build(*args)
+    if block_given?
+      yield process
+    end
     process.io.stdout = process.io.stderr = w
 
     process.start
