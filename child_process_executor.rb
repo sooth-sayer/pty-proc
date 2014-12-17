@@ -24,6 +24,6 @@ class ChildProcessExecutor
 
     r.close
     process.wait
-    process.exit_code
+    process.exit_code == 0
   end
 end

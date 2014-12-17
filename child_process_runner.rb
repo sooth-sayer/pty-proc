@@ -20,26 +20,29 @@ class ChildProcessRunner
   def run(repo)
     image_name = repo.gsub(/.*\/(.*)\.git/, '\1') + IMAGE_POSTFIX
     Dir.mktmpdir do |dir|
+      success = true
       clone_path = "#{dir}/exercise"
 
-      git_result = git_clone(repo, clone_path)
-      unless check_exit_status(git_result)
-        puts "Git clone returns with error #{git_result}"
-        exit(false)
+      success = git_clone(repo, clone_path)
+      if success
+        puts 'Repository cloned successfully!'
+      else
+        puts 'Git clone failed'
       end
-      puts "Repository cloned successfully!"
 
-      docker_build_result = docker_build(image_name, clone_path)
-      unless check_exit_status(docker_build_result)
-        puts "Docker build returns with error #{docker_build_result}"
-        exit(false)
+      success &&= docker_build(image_name, clone_path)
+      if success
+        puts 'Docker image was built successfully!'
+      else
+        puts 'Docker build failed'
       end
-      puts "Docker image was built successfully!"
 
-      test_with_solution_result = run_test_with_solution(clone_path, image_name)
-      test_without_solution_result = run_test_without_solution(clone_path, image_name)
+      if success
+        test_with_solution_result = run_test_with_solution(clone_path, image_name)
+        test_without_solution_result = run_test_without_solution(clone_path, image_name)
 
-      puts "Tests completed with results: #{test_with_solution_result}, #{test_without_solution_result}"
+        puts "Tests completed with results: #{test_with_solution_result}, #{test_without_solution_result}"
+      end
     end
   end
 
@@ -89,9 +92,5 @@ class ChildProcessRunner
 
   def docker_build(image_name, build_path)
     ChildProcessExecutor.start('docker', 'build', "--tag=#{image_name}", build_path, log)
-  end
-
-  def check_exit_status(exitstatus)
-    exitstatus == 0
   end
 end
