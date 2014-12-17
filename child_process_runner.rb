@@ -3,11 +3,19 @@ require 'io/wait'
 require 'ptools'
 require 'tmpdir'
 require 'exercise_marker_handler'
+require 'child_process_executor'
+require 'stringio'
 
 ChildProcess.posix_spawn = true
 
 class ChildProcessRunner
   IMAGE_POSTFIX = "_image"
+
+  attr_reader :log
+
+  def initialize
+    @log = StringIO.new
+  end
 
   def run(repo)
     image_name = repo.gsub(/.*\/(.*)\.git/, '\1') + IMAGE_POSTFIX
@@ -64,61 +72,21 @@ class ChildProcessRunner
   def run_tests(repo_path, target, image_name)
     runner_volume = File.expand_path('./templates')
 
-    r, w = IO.pipe
-    process = ChildProcess.build('docker',
-               'run',
-               "--volume=#{runner_volume}:/runner",
-               "--volume=#{repo_path}/exercise:/usr/src/app",
-               image_name,
-               '/bin/bash',
-               "/runner/#{target}.sh")
-
-    process.io.stdout = process.io.stderr = w
-    process.start
-    w.close
-
-    while r.wait do
-      buf = r.read_nonblock(4096)
-      print buf
-    end
-
-    process.wait
-    process.exit_code
+    ChildProcessExecutor.start('docker',
+                               'run',
+                               "--volume=#{runner_volume}:/runner",
+                               "--volume=#{repo_path}/exercise:/usr/src/app",
+                               image_name,
+                               '/bin/bash',
+                               "/runner/#{target}.sh", log)
   end
 
   def git_clone(repo, clone_path)
-    File.open("git_stdout.log", "w") do |file|
-      r, w = IO.pipe
-      process = ChildProcess.build('git', 'clone', '--progress', repo, clone_path)
-      process.io.stderr = process.io.stdout = w
-      process.start
-      w.close
-
-      while r.wait do
-        buf = r.read_nonblock(4096)
-        print buf
-        file.write(buf)
-      end
-
-      process.wait
-      process.exit_code
-    end
+    ChildProcessExecutor.start('git', 'clone', '--progress', repo, clone_path, log)
   end
 
   def docker_build(image_name, build_path)
-    r, w = IO.pipe
-    process = ChildProcess.build('docker', 'build', "--tag=#{image_name}", build_path)
-    process.io.stderr = process.io.stdout = w
-    process.start
-    w.close
-
-    while r.wait do
-      buf = r.read_nonblock(4096)
-      print buf
-    end
-
-    process.wait
-    process.exit_code
+    ChildProcessExecutor.start('docker', 'build', "--tag=#{image_name}", build_path, log)
   end
 
   def check_exit_status(exitstatus)
